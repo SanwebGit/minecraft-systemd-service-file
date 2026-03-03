@@ -1,26 +1,44 @@
 [Unit]
 Description=Minecraft Server
 
-Wants=network.target
-After=network.target
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 User=minecraft
 Group=minecraft
 Nice=5
-KillMode=control-group
-RemainAfterExit=yes
-SuccessExitStatus=0 1
 
+# 'simple' geht davon aus, dass 'start-server.sh' den Java-Prozess im Vordergrund ausführt.
+# (Falls dein Skript 'screen' oder 'tmux' nutzt, müsstest du Type=forking setzen)
+Type=forking
+
+# Automatischer Neustart, falls der Server abstürzt
+Restart=on-failure
+RestartSec=10
+
+# 143 ist der Standard-Exit-Code für einen von Systemd beendeten Java-Prozess (SIGTERM).
+SuccessExitStatus=0 1 143
+
+WorkingDirectory=/var/minecraft/server
+ExecStart=/bin/bash /var/minecraft/server/start-server.sh
+
+TimeoutStopSec=60
+
+# --- Sicherheits-Optimierungen (Hardening) ---
 ProtectHome=true
-ProtectSystem=full
+ProtectSystem=strict
 PrivateDevices=true
 NoNewPrivileges=true
 PrivateTmp=true
-InaccessibleDirectories=/root /sys /srv -/opt /media -/lost+found
-ReadWriteDirectories=/var/minecraft/server
-WorkingDirectory=/var/minecraft/server
-ExecStart=bash start-server.sh
+
+InaccessiblePaths=/root /sys /srv -/opt /media -/lost+found
+ReadWritePaths=/var/minecraft/server
+
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
 
 [Install]
 WantedBy=multi-user.target
