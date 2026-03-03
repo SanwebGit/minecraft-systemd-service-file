@@ -1,25 +1,58 @@
 [Unit]
 Description=Minecraft Server
-
-Wants=network.target
-After=network.target
+# Wartet auf eine aktive Netzwerkverbindung
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 User=minecraft
 Group=minecraft
 Nice=5
-KillMode=control-group
-SuccessExitStatus=0 1
+WorkingDirectory=/var/minecraft/server
 
+# Neustart bei Absturz nach 10 Sekunden
+Restart=on-failure
+RestartSec=10s
+
+# Minecraft beendet sich oft mit 143 (SIGTERM), was wir als Erfolg werten
+SuccessExitStatus=0 1 143
+
+# --- Sicherheit & Hardening ---
 ProtectHome=true
 ProtectSystem=full
 PrivateDevices=true
 NoNewPrivileges=true
 PrivateTmp=true
-InaccessibleDirectories=/root /sys /srv -/opt /media -/lost+found
-ReadWriteDirectories=/var/minecraft/server
-WorkingDirectory=/var/minecraft/server
-ExecStart=/usr/bin/java -Xmx1G -jar server.jar nogui
+# Schränkt den Zugriff auf das Root-Dateisystem ein
+InaccessiblePaths=/root /sys /srv -/opt /media
+# Erlaubt Schreibzugriff nur im Server-Verzeichnis
+ReadWritePaths=/var/minecraft/server
+
+# --- Performance & ExecStart ---
+# Enthält Aikar's Flags für optimierte G1 Garbage Collection (GC)
+# Passe -Xms und -Xmx an deinen verfügbaren RAM an
+ExecStart=/usr/bin/java -Xms2G -Xmx2G \
+  -XX:+UseG1GC \
+  -XX:+ParallelRefProcEnabled \
+  -XX:MaxGCPauseMillis=200 \
+  -XX:+UnlockExperimentalVMOptions \
+  -XX:+DisableExplicitGC \
+  -XX:+AlwaysPreTouch \
+  -XX:G1NewSizePercent=30 \
+  -XX:G1MaxNewSizePercent=40 \
+  -XX:G1HeapRegionSize=8M \
+  -XX:G1ReservePercent=20 \
+  -XX:G1HeapWastePercent=5 \
+  -XX:G1MixedGCCountTarget=4 \
+  -XX:InitiatingHeapOccupancyPercent=15 \
+  -XX:G1MixedGCLiveThresholdPercent=90 \
+  -XX:G1RSetUpdatingPauseTimePercent=5 \
+  -XX:SurvivorRatio=32 \
+  -XX:+PerfDisableSharedMem \
+  -XX:MaxTenuringThreshold=1 \
+  -Dusing.aikars.flags=https://mcflags.emc.gs \
+  -Daikars.new.flags=true \
+  -jar server.jar nogui
 
 [Install]
 WantedBy=multi-user.target
